@@ -1,0 +1,4 @@
+<resources>
+    <string name="app_name">OG SAHID AI</string>
+    <string name="accessibility_service_description">Enables OG SAHID AI to perform voice-requested actions like opening apps, tapping buttons, scrolling, navigating back/home, and assisting with messaging.</string>
+</resources>

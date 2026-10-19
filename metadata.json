@@ -1,0 +1,6 @@
+{
+  "name": "OG SAHID AI",
+  "description": "Comprehensive Android Assistant: Natural Female Voice, Accessibility Phone Automation, Rainbow RGB Edge Border, Coding, and Memory.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
