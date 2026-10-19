@@ -307,12 +307,93 @@ object PhoneAutomationHelper {
         }
     }
 
+    fun openApp(context: Context, appName: String): AutomationResult {
+        val pm = context.packageManager
+        val queryLower = appName.lowercase().trim()
+
+        val packageMap = mapOf(
+            "whatsapp" to "com.whatsapp",
+            "youtube" to "com.google.android.youtube",
+            "chrome" to "com.android.chrome",
+            "camera" to "com.android.camera",
+            "settings" to "com.android.settings",
+            "calculator" to "com.google.android.calculator",
+            "clock" to "com.google.android.deskclock",
+            "maps" to "com.google.android.apps.maps",
+            "gallery" to "com.google.android.apps.photos",
+            "play store" to "com.android.vending",
+            "gmail" to "com.google.android.gm"
+        )
+
+        val targetPkg = packageMap[queryLower]
+        if (targetPkg != null) {
+            val intent = pm.getLaunchIntentForPackage(targetPkg)
+            if (intent != null) {
+                intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                context.startActivity(intent)
+                return AutomationResult(true, "Open $appName", "$appName opened successfully.")
+            }
+        }
+
+        // Search installed applications
+        try {
+            val packages = pm.getInstalledApplications(0)
+            for (app in packages) {
+                val label = pm.getApplicationLabel(app).toString().lowercase()
+                if (label == queryLower || label.contains(queryLower)) {
+                    val launchIntent = pm.getLaunchIntentForPackage(app.packageName)
+                    if (launchIntent != null) {
+                        launchIntent.flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                        context.startActivity(launchIntent)
+                        return AutomationResult(true, "Open ${pm.getApplicationLabel(app)}", "${pm.getApplicationLabel(app)} launched.")
+                    }
+                }
+            }
+        } catch (_: Exception) {}
+
+        return AutomationResult(false, "Open $appName", "Could not locate app '$appName' installed on this device.")
+    }
+
+    fun adjustVolume(context: Context, raise: Boolean): AutomationResult {
+        return try {
+            val am = context.getSystemService(Context.AUDIO_SERVICE) as android.media.AudioManager
+            val direction = if (raise) android.media.AudioManager.ADJUST_RAISE else android.media.AudioManager.ADJUST_LOWER
+            am.adjustStreamVolume(android.media.AudioManager.STREAM_MUSIC, direction, android.media.AudioManager.FLAG_SHOW_UI)
+            AutomationResult(true, "Volume Control", if (raise) "Volume increased." else "Volume decreased.")
+        } catch (e: Exception) {
+            AutomationResult(false, "Volume Control", "Could not adjust volume: ${e.localizedMessage}")
+        }
+    }
+
+    fun setMuteVolume(context: Context, mute: Boolean): AutomationResult {
+        return try {
+            val am = context.getSystemService(Context.AUDIO_SERVICE) as android.media.AudioManager
+            val direction = if (mute) android.media.AudioManager.ADJUST_MUTE else android.media.AudioManager.ADJUST_UNMUTE
+            am.adjustStreamVolume(android.media.AudioManager.STREAM_MUSIC, direction, android.media.AudioManager.FLAG_SHOW_UI)
+            AutomationResult(true, "Mute Volume", if (mute) "Volume muted." else "Volume unmuted.")
+        } catch (e: Exception) {
+            AutomationResult(false, "Mute Volume", "Failed: ${e.localizedMessage}")
+        }
+    }
+
+    fun openDisplaySettings(context: Context): AutomationResult {
+        return try {
+            val intent = Intent(Settings.ACTION_DISPLAY_SETTINGS).apply {
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK
+            }
+            context.startActivity(intent)
+            AutomationResult(true, "Display Settings", "Opened Display and Brightness settings.")
+        } catch (e: Exception) {
+            AutomationResult(false, "Display Settings", "Failed to open display settings: ${e.localizedMessage}")
+        }
+    }
+
     fun addCalendarEvent(context: Context, title: String, description: String): AutomationResult {
         return try {
             val intent = Intent(Intent.ACTION_INSERT).apply {
-                data = CalendarContract.Events.CONTENT_URI
-                putExtra(CalendarContract.Events.TITLE, title)
-                putExtra(CalendarContract.Events.DESCRIPTION, description)
+                data = android.provider.CalendarContract.Events.CONTENT_URI
+                putExtra(android.provider.CalendarContract.Events.TITLE, title)
+                putExtra(android.provider.CalendarContract.Events.DESCRIPTION, description)
                 flags = Intent.FLAG_ACTIVITY_NEW_TASK
             }
             context.startActivity(intent)

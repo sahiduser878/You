@@ -22,6 +22,6 @@ dependencyResolutionManagement {
   }
 }
 
-rootProject.name = "OG SAHID AI"
+rootProject.name = "NISU AI"
 
 include(":app")

@@ -164,7 +164,7 @@ class RgbBorderOverlayService : Service() {
 
     private fun startForegroundNotification() {
         val channelId = "rgb_border_service_channel"
-        val channelName = "OG SAHID AI RGB Border"
+        val channelName = "NISU AI RGB Border"
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val channel = NotificationChannel(
                 channelId,
@@ -176,7 +176,7 @@ class RgbBorderOverlayService : Service() {
         }
 
         val notification: Notification = NotificationCompat.Builder(this, channelId)
-            .setContentTitle("OG SAHID AI Active")
+            .setContentTitle("NISU AI Active")
             .setContentText("Rainbow RGB edge border is running over apps")
             .setSmallIcon(android.R.drawable.ic_menu_compass)
             .setPriority(NotificationCompat.PRIORITY_LOW)
@@ -203,17 +203,39 @@ class RgbBorderView(
     private var speedFactor: Float
 ) : View(context) {
 
-    private val rainbowColors = intArrayOf(
-        Color.parseColor("#FF0055"), // Red/Pink
-        Color.parseColor("#FF6600"), // Orange
-        Color.parseColor("#FFCC00"), // Yellow
-        Color.parseColor("#00FF66"), // Green
-        Color.parseColor("#00FFFF"), // Cyan
-        Color.parseColor("#0066FF"), // Blue
-        Color.parseColor("#9900FF"), // Purple
-        Color.parseColor("#FF0099"), // Neon Pink
-        Color.parseColor("#FF0055")  // Loop back
-    )
+    private fun getPaletteColors(palette: String): IntArray {
+        return when (palette) {
+            SettingsManager.PALETTE_NEON_PINK -> intArrayOf(
+                Color.parseColor("#FF1493"), Color.parseColor("#FF69B4"),
+                Color.parseColor("#FF007F"), Color.parseColor("#FF80BF"), Color.parseColor("#FF1493")
+            )
+            SettingsManager.PALETTE_CYBERPUNK_BLUE -> intArrayOf(
+                Color.parseColor("#00E5FF"), Color.parseColor("#0077FF"),
+                Color.parseColor("#7000FF"), Color.parseColor("#00E5FF")
+            )
+            SettingsManager.PALETTE_WARM_SUNSET -> intArrayOf(
+                Color.parseColor("#FF512F"), Color.parseColor("#DD2476"),
+                Color.parseColor("#FF8800"), Color.parseColor("#FF512F")
+            )
+            SettingsManager.PALETTE_ELECTRIC_GREEN -> intArrayOf(
+                Color.parseColor("#00FF87"), Color.parseColor("#60EFFF"),
+                Color.parseColor("#00E676"), Color.parseColor("#00FF87")
+            )
+            else -> intArrayOf(
+                Color.parseColor("#FF0055"),
+                Color.parseColor("#FF6600"),
+                Color.parseColor("#FFCC00"),
+                Color.parseColor("#00FF66"),
+                Color.parseColor("#00FFFF"),
+                Color.parseColor("#0066FF"),
+                Color.parseColor("#9900FF"),
+                Color.parseColor("#FF0099"),
+                Color.parseColor("#FF0055")
+            )
+        }
+    }
+
+    private var activeColors = getPaletteColors(SettingsManager(context).getRgbBorderPalette())
 
     private val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         style = Paint.Style.STROKE
@@ -228,9 +250,11 @@ class RgbBorderView(
     }
 
     fun updateConfig(widthDp: Float, bright: Float, speed: Float) {
+        val settings = SettingsManager(context)
         this.strokeWidthDp = widthDp
         this.brightness = bright
         this.speedFactor = speed
+        this.activeColors = getPaletteColors(settings.getRgbBorderPalette())
         updatePaint()
         startAnimation()
         invalidate()
@@ -268,7 +292,7 @@ class RgbBorderView(
         // Animated SweepGradient centered on screen for continuous smooth rainbow flow around all edges
         canvas.save()
         canvas.rotate(currentPhase * 360f, w / 2f, h / 2f)
-        val shader = SweepGradient(w / 2f, h / 2f, rainbowColors, null)
+        val shader = SweepGradient(w / 2f, h / 2f, activeColors, null)
         paint.shader = shader
         canvas.restore()
 

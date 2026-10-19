@@ -69,14 +69,7 @@ class VoiceManager(
         if (status == TextToSpeech.SUCCESS) {
             isTtsReady = true
             textToSpeech?.let { tts ->
-                val locale = Locale.getDefault()
-                if (tts.isLanguageAvailable(locale) >= TextToSpeech.LANG_AVAILABLE) {
-                    tts.language = locale
-                } else {
-                    tts.language = Locale.US
-                }
-                tts.setPitch(settingsManager.getVoicePitch())
-                tts.setSpeechRate(settingsManager.getVoiceSpeed())
+                applyFemaleVoiceSettings(tts)
                 tts.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
                     override fun onStart(utteranceId: String?) {
                         updateState(VoiceCallState.SPEAKING)
@@ -92,6 +85,41 @@ class VoiceManager(
                 })
             }
         }
+    }
+
+    private fun applyFemaleVoiceSettings(tts: TextToSpeech) {
+        try {
+            val preferredLang = settingsManager.getLanguage()
+            val targetLocale = when {
+                preferredLang.contains("Hindi") -> Locale("hi", "IN")
+                preferredLang.contains("Hinglish") -> Locale("en", "IN")
+                else -> Locale.US
+            }
+
+            if (tts.isLanguageAvailable(targetLocale) >= TextToSpeech.LANG_AVAILABLE) {
+                tts.language = targetLocale
+            } else {
+                tts.language = Locale.US
+            }
+
+            // Find best natural female voice
+            val voices = tts.voices
+            if (!voices.isNullOrEmpty()) {
+                val femaleVoice = voices.firstOrNull { v ->
+                    val name = v.name.lowercase()
+                    (v.locale.language == targetLocale.language || v.locale.language == "en") &&
+                            (name.contains("female") || name.contains("#female") || name.contains("woman") ||
+                             name.contains("sfg") || name.contains("hie") || name.contains("cfl"))
+                } ?: voices.firstOrNull { it.name.lowercase().contains("female") }
+
+                if (femaleVoice != null) {
+                    tts.voice = femaleVoice
+                }
+            }
+        } catch (_: Exception) {}
+
+        tts.setPitch(settingsManager.getVoicePitch())
+        tts.setSpeechRate(settingsManager.getVoiceSpeed())
     }
 
     private fun onSpeechFinished() {
@@ -141,11 +169,24 @@ class VoiceManager(
         }
 
         try {
+            val lang = settingsManager.getLanguage()
+            val localeTag = when {
+                lang.contains("Hindi") -> "hi-IN"
+                lang.contains("Hinglish") -> "en-IN"
+                else -> "en-US"
+            }
+
             val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
                 putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
                 putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true)
                 putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 1)
                 putExtra(RecognizerIntent.EXTRA_CALLING_PACKAGE, context.packageName)
+                putExtra(RecognizerIntent.EXTRA_LANGUAGE, localeTag)
+                putExtra(RecognizerIntent.EXTRA_LANGUAGE_PREFERENCE, localeTag)
+                // Real-time responsiveness: short silence detection to avoid 10s wait
+                putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS, 1000L)
+                putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_POSSIBLY_COMPLETE_SILENCE_LENGTH_MILLIS, 700L)
+                putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_MINIMUM_LENGTH_MILLIS, 1000L)
             }
             speechRecognizer?.startListening(intent)
             updateState(VoiceCallState.LISTENING)
@@ -185,7 +226,7 @@ class VoiceManager(
                     },
                     onError = { errorMsg ->
                         onVoiceError(errorMsg)
-                        // Fallback to system female TTS if online provider fails
+                        // Immediate fallback to sweet female system voice
                         speakViaSystemTts(text)
                     }
                 )
@@ -202,12 +243,14 @@ class VoiceManager(
         }
         updateState(VoiceCallState.SPEAKING)
 
-        textToSpeech?.apply {
-            setPitch(settingsManager.getVoicePitch())
-            setSpeechRate(settingsManager.getVoiceSpeed())
-            val params = Bundle()
-            params.putString(TextToSpeech.Engine.KEY_PARAM_UTTERANCE_ID, "og_sahid_utterance_${System.currentTimeMillis()}")
-            speak(text, TextToSpeech.QUEUE_FLUSH, params, "og_sahid_utterance_${System.currentTimeMillis()}")
+        textToSpeech?.let { tts ->
+            applyFemaleVoiceSettings(tts)
+            val volume = settingsManager.getVoiceVolume()
+            val params = Bundle().apply {
+                putString(TextToSpeech.Engine.KEY_PARAM_UTTERANCE_ID, "nisu_utterance_${System.currentTimeMillis()}")
+                putFloat(TextToSpeech.Engine.KEY_PARAM_VOLUME, volume)
+            }
+            tts.speak(text, TextToSpeech.QUEUE_FLUSH, params, "nisu_utterance_${System.currentTimeMillis()}")
         }
     }
 

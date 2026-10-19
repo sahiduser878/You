@@ -14,6 +14,7 @@ import com.example.data.local.entity.ChatMessageEntity
 import com.example.data.local.entity.MemoryEntity
 import com.example.data.repository.MemoryRepository
 import com.example.overlay.RgbBorderOverlayService
+import com.example.screen.ScreenCaptureHelper
 import com.example.voice.VoiceCallState
 import com.example.voice.VoiceManager
 import kotlinx.coroutines.Job
@@ -29,14 +30,33 @@ enum class Screen {
     HOME,
     CHAT,
     CALLING,
-    CODING,
+    SCREEN_SHARE,
+    EDGE_GLOW,
+    ACCESSIBILITY,
     AUTOMATION,
+    CODING,
     MEMORY,
     TOOLS,
     SETTINGS,
     PERMISSIONS,
     ABOUT
 }
+
+enum class VoiceCommandStatus {
+    READY,
+    LISTENING,
+    PROCESSING,
+    EXECUTING,
+    SPEAKING,
+    COMPLETED
+}
+
+data class CommandActivityItem(
+    val title: String,
+    val description: String,
+    val timeAgo: String,
+    val isSuccess: Boolean
+)
 
 class MainViewModel(application: Application) : AndroidViewModel(application) {
 
@@ -49,6 +69,26 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val _currentScreen = MutableStateFlow(Screen.HOME)
     val currentScreen: StateFlow<Screen> = _currentScreen.asStateFlow()
 
+    // Screen understanding & capture helper
+    val screenCaptureHelper = ScreenCaptureHelper(application, settingsManager, viewModelScope)
+
+    // Voice Command Status Pipeline
+    private val _commandStatus = MutableStateFlow(VoiceCommandStatus.READY)
+    val commandStatus: StateFlow<VoiceCommandStatus> = _commandStatus.asStateFlow()
+
+    private val _currentActionText = MutableStateFlow("Ready for voice commands")
+    val currentActionText: StateFlow<String> = _currentActionText.asStateFlow()
+
+    // Recent activity list
+    private val _recentActivity = MutableStateFlow(
+        listOf(
+            CommandActivityItem("NISU AI Initialized", "Fast voice engine ready with Sweet Romantic pack", "Just now", true),
+            CommandActivityItem("Accessibility Ready", "System automation & phone control active", "1m ago", true),
+            CommandActivityItem("RGB Edge Lighting", "Customizable multi-color border loaded", "2m ago", true)
+        )
+    )
+    val recentActivity: StateFlow<List<CommandActivityItem>> = _recentActivity.asStateFlow()
+
     // Chat / Calling UI states
     val chatMessages: StateFlow<List<ChatMessageEntity>> = memoryRepository.chatMessages
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
@@ -59,7 +99,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val _isGenerating = MutableStateFlow(false)
     val isGenerating: StateFlow<Boolean> = _isGenerating.asStateFlow()
 
-    private val _callSubtitles = MutableStateFlow("Tap Start Call to talk with OG SAHID AI.")
+    private val _callSubtitles = MutableStateFlow("Tap Start Call to talk with NISU AI.")
     val callSubtitles: StateFlow<String> = _callSubtitles.asStateFlow()
 
     private val _callDurationSeconds = MutableStateFlow(0)
@@ -82,8 +122,14 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val _lastAutomationResult = MutableStateFlow<AutomationResult?>(null)
     val lastAutomationResult: StateFlow<AutomationResult?> = _lastAutomationResult.asStateFlow()
 
+    fun dismissAutomationBanner() {
+        _lastAutomationResult.value = null
+    }
+
     // Pending confirmation for sensitive actions (e.g. WhatsApp send)
     private var pendingAction: (() -> AutomationResult)? = null
+    private val _pendingConfirmationMessage = MutableStateFlow<String?>(null)
+    val pendingConfirmationMessage: StateFlow<String?> = _pendingConfirmationMessage.asStateFlow()
 
     // Coding Assistant states
     private val _generatedCode = MutableStateFlow<String?>(null)
@@ -109,10 +155,32 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 onUserSpeechReceived(text)
             },
             onVoiceStateChanged = { state ->
-                // State changed
+                when (state) {
+                    VoiceCallState.LISTENING -> {
+                        _commandStatus.value = VoiceCommandStatus.LISTENING
+                        _currentActionText.value = "Listening to you..."
+                    }
+                    VoiceCallState.THINKING -> {
+                        _commandStatus.value = VoiceCommandStatus.PROCESSING
+                        _currentActionText.value = "Processing command..."
+                    }
+                    VoiceCallState.SPEAKING -> {
+                        _commandStatus.value = VoiceCommandStatus.SPEAKING
+                        _currentActionText.value = "NISU speaking..."
+                    }
+                    VoiceCallState.IDLE -> {
+                        if (_commandStatus.value != VoiceCommandStatus.EXECUTING) {
+                            _commandStatus.value = VoiceCommandStatus.READY
+                            _currentActionText.value = "Ready"
+                        }
+                    }
+                    VoiceCallState.MUTED -> {
+                        _currentActionText.value = "Microphone muted"
+                    }
+                }
             },
             onVoiceError = { errorMsg ->
-                _voiceTestStatus.value = "Voice Warning: $errorMsg (falling back to native voice)"
+                _voiceTestStatus.value = "Voice note: $errorMsg (playing sweet native voice)"
             }
         )
     }
@@ -130,6 +198,19 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             stopCalling()
         }
         _currentScreen.value = screen
+    }
+
+    // --- Real-time Fast Microphone Trigger ---
+    fun startListeningInstant() {
+        _commandStatus.value = VoiceCommandStatus.LISTENING
+        _currentActionText.value = "Listening... Speak your command"
+        voiceManager.startListeningOnce()
+    }
+
+    fun stopListeningInstant() {
+        voiceManager.stopListening()
+        _commandStatus.value = VoiceCommandStatus.READY
+        _currentActionText.value = "Ready"
     }
 
     // --- Voice Calling Mode ---
@@ -161,6 +242,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun interruptCall() {
         voiceManager.interruptAndListen()
         _callSubtitles.value = "Interrupted. Listening to you..."
+        _commandStatus.value = VoiceCommandStatus.LISTENING
     }
 
     private fun onUserSpeechReceived(speechText: String) {
@@ -168,12 +250,14 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         sendChatMessage(speechText, isVoiceCall = true)
     }
 
-    // --- Chat & Gemini Integration ---
+    // --- Chat & Real-Time Command Pipeline ---
     fun sendChatMessage(prompt: String, bitmap: Bitmap? = null, isVoiceCall: Boolean = false) {
         if (prompt.isBlank() && bitmap == null) return
 
         viewModelScope.launch {
             _isGenerating.value = true
+            _commandStatus.value = VoiceCommandStatus.PROCESSING
+            _currentActionText.value = "Analyzing: \"$prompt\""
             memoryRepository.insertChatMessage("user", prompt)
 
             val apiKey = settingsManager.getApiKey()
@@ -182,32 +266,47 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             val language = settingsManager.getLanguage()
             val temperature = settingsManager.getTemperature()
 
-            // Check if user gave a phone automation or accessibility command!
+            // 1. FAST LOCAL AUTOMATION / ACCESSIBILITY CHECK (0ms latency!)
             val autoResult = checkAndRunAutomationCommand(prompt)
             if (autoResult != null) {
+                _commandStatus.value = VoiceCommandStatus.EXECUTING
                 _lastAutomationResult.value = autoResult
-                pendingAction = autoResult.pendingAction
 
-                val responseMsg = if (autoResult.requiresUserConfirmation) {
-                    autoResult.message
+                if (autoResult.requiresUserConfirmation) {
+                    pendingAction = autoResult.pendingAction
+                    _pendingConfirmationMessage.value = autoResult.message
                 } else {
-                    autoResult.message
+                    pendingAction = null
+                    _pendingConfirmationMessage.value = null
                 }
 
+                val responseMsg = autoResult.message
                 memoryRepository.insertChatMessage("assistant", responseMsg)
+                _currentActionText.value = autoResult.actionName
+                _commandStatus.value = VoiceCommandStatus.COMPLETED
+
+                addRecentActivity(
+                    title = autoResult.actionName,
+                    description = autoResult.message,
+                    success = autoResult.success
+                )
+
                 if (isVoiceCall || settingsManager.isAutoTtsEnabled()) {
-                    _callSubtitles.value = "OG SAHID AI: $responseMsg"
+                    _callSubtitles.value = "NISU AI: $responseMsg"
                     voiceManager.speak(responseMsg)
                 }
                 _isGenerating.value = false
                 return@launch
             }
 
+            // 2. CONVERSATIONAL AI (GEMINI)
             if (apiKey.isBlank()) {
-                val placeholderMsg = "Hello! I am OG SAHID AI. To enable full reasoning and conversational intelligence, please enter your Gemini API Key in Settings > AI Configuration."
+                val placeholderMsg = "Hello! I am NISU AI. To enable full reasoning, please enter your Gemini API Key in Settings > AI Configuration."
                 memoryRepository.insertChatMessage("assistant", placeholderMsg)
+                _commandStatus.value = VoiceCommandStatus.COMPLETED
+                _currentActionText.value = "Awaiting API Key"
                 if (isVoiceCall || settingsManager.isAutoTtsEnabled()) {
-                    _callSubtitles.value = "OG SAHID AI: $placeholderMsg"
+                    _callSubtitles.value = "NISU AI: $placeholderMsg"
                     voiceManager.speak(placeholderMsg)
                 }
                 _isGenerating.value = false
@@ -217,6 +316,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             val recentMemories = memoryRepository.getRecentMemoriesForContext()
             val history = memoryRepository.getRecentChatMessages(6).map { it.sender to it.text }
 
+            _commandStatus.value = VoiceCommandStatus.PROCESSING
             val result = geminiService.sendMessage(
                 apiKey = apiKey,
                 model = model,
@@ -232,20 +332,35 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             result.fold(
                 onSuccess = { reply ->
                     memoryRepository.insertChatMessage("assistant", reply)
-                    _callSubtitles.value = "OG SAHID AI: $reply"
+                    _callSubtitles.value = "NISU AI: $reply"
+                    _commandStatus.value = VoiceCommandStatus.SPEAKING
+                    _currentActionText.value = "Responding"
                     if (isVoiceCall || settingsManager.isAutoTtsEnabled()) {
                         voiceManager.speak(reply)
                     }
                     detectAndStoreMemory(prompt, reply)
+                    addRecentActivity("AI Response", prompt.take(30), true)
                 },
                 onFailure = { err ->
                     val errorText = "Encountered an issue: ${err.message}"
                     memoryRepository.insertChatMessage("assistant", errorText)
-                    _callSubtitles.value = "OG SAHID AI: $errorText"
+                    _callSubtitles.value = "NISU AI: $errorText"
+                    _commandStatus.value = VoiceCommandStatus.COMPLETED
+                    _currentActionText.value = "Error"
                 }
             )
 
             _isGenerating.value = false
+        }
+    }
+
+    private fun addRecentActivity(title: String, description: String, success: Boolean) {
+        val current = _recentActivity.value.toMutableList()
+        current.add(0, CommandActivityItem(title, description, "Just now", success))
+        if (current.size > 8) {
+            _recentActivity.value = current.take(8)
+        } else {
+            _recentActivity.value = current
         }
     }
 
@@ -256,9 +371,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             val result = action.invoke()
             _lastAutomationResult.value = result
             pendingAction = null
+            _pendingConfirmationMessage.value = null
+            _commandStatus.value = VoiceCommandStatus.COMPLETED
+
             viewModelScope.launch {
                 memoryRepository.insertChatMessage("assistant", "Confirmed: ${result.message}")
             }
+            addRecentActivity("Confirmed Action", result.message, result.success)
             if (settingsManager.isAutoTtsEnabled()) {
                 voiceManager.speak("Confirmed. ${result.message}")
             }
@@ -267,11 +386,14 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun cancelPendingAction() {
         pendingAction = null
+        _pendingConfirmationMessage.value = null
         _lastAutomationResult.value = null
+        _commandStatus.value = VoiceCommandStatus.READY
         val msg = "Action cancelled."
         viewModelScope.launch {
             memoryRepository.insertChatMessage("assistant", msg)
         }
+        addRecentActivity("Cancelled Action", "User aborted action", false)
         if (settingsManager.isAutoTtsEnabled()) {
             voiceManager.speak(msg)
         }
@@ -286,6 +408,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         if (pendingAction != null && (lower == "confirm" || lower == "yes" || lower == "send" || lower == "bhejo" || lower == "haan" || lower == "send it")) {
             val res = pendingAction?.invoke()
             pendingAction = null
+            _pendingConfirmationMessage.value = null
             return res ?: AutomationResult(true, "Action Confirmed", "Dispatched requested action.")
         }
 
@@ -294,7 +417,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             lower.contains("whatsapp") && (lower.contains("send") || lower.contains("bhejo") || lower.contains("type") || lower.contains("message")) -> {
                 val contact = extractContactName(lower)
                 val msg = extractMessageText(lower)
-                PhoneAutomationHelper.prepareWhatsAppMessage(context, contact, msg, confirmed = false)
+                PhoneAutomationHelper.prepareWhatsAppMessage(context, contact, msg, confirmed = !settingsManager.isConfirmSensitiveEnabled())
             }
 
             // Open WhatsApp direct
@@ -315,6 +438,18 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             lower.contains("scroll up") || lower == "upar scroll karo" -> {
                 PhoneAutomationHelper.performScrollUp()
             }
+            lower.contains("recent apps") || lower.contains("recents") -> {
+                OgSahidAccessibilityService.instance?.let {
+                    val ok = it.performRecents()
+                    AutomationResult(ok, "Recent Apps", if (ok) "Opened recent apps." else "Accessibility action failed.")
+                } ?: AutomationResult(false, "Recent Apps", "Accessibility service not active.")
+            }
+            lower.contains("notifications") -> {
+                OgSahidAccessibilityService.instance?.let {
+                    val ok = it.performNotifications()
+                    AutomationResult(ok, "Notifications", if (ok) "Expanded notifications panel." else "Accessibility action failed.")
+                } ?: AutomationResult(false, "Notifications", "Accessibility service not active.")
+            }
 
             // Tap on specific UI target
             lower.startsWith("tap ") || lower.startsWith("click ") || lower.startsWith("daba do ") -> {
@@ -326,6 +461,22 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             lower.startsWith("type ") || lower.startsWith("likho ") -> {
                 val text = lower.removePrefix("type ").removePrefix("likho ").trim()
                 PhoneAutomationHelper.enterText(text)
+            }
+
+            // Brightness controls
+            lower.contains("brightness") -> {
+                PhoneAutomationHelper.openDisplaySettings(context)
+            }
+
+            // Volume controls
+            lower.contains("increase volume") || lower.contains("volume up") || lower.contains("awaz badhao") -> {
+                PhoneAutomationHelper.adjustVolume(context, raise = true)
+            }
+            lower.contains("decrease volume") || lower.contains("volume down") || lower.contains("awaz kam karo") -> {
+                PhoneAutomationHelper.adjustVolume(context, raise = false)
+            }
+            lower.contains("mute") || lower.contains("chup ho jao") -> {
+                PhoneAutomationHelper.setMuteVolume(context, mute = true)
             }
 
             // YouTube
@@ -351,18 +502,24 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             // Timer
             lower.contains("timer") -> {
                 val seconds = Regex("""\d+""").find(lower)?.value?.toIntOrNull() ?: 60
-                PhoneAutomationHelper.setTimer(context, seconds, "OG SAHID AI Timer")
+                PhoneAutomationHelper.setTimer(context, seconds, "NISU AI Timer")
             }
 
             // Alarm
             lower.contains("alarm") -> {
-                PhoneAutomationHelper.setAlarm(context, 7, 0, "Morning with OG SAHID AI")
+                PhoneAutomationHelper.setAlarm(context, 7, 0, "Morning with NISU AI")
             }
 
             // Call
             lower.startsWith("call ") -> {
                 val number = Regex("""\d+""").find(lower)?.value ?: ""
                 if (number.isNotBlank()) PhoneAutomationHelper.openDialer(context, number) else null
+            }
+
+            // Generic Open App command (e.g. "open chrome", "open maps", "open calculator")
+            lower.startsWith("open ") || lower.startsWith("launch ") -> {
+                val targetApp = lower.removePrefix("open ").removePrefix("launch ").trim()
+                PhoneAutomationHelper.openApp(context, targetApp)
             }
 
             // Web Search
@@ -414,11 +571,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     // --- Voice Studio Preview Test ---
-    fun testVoicePreview(sampleText: String = "Hello! I am OG SAHID AI, your personal Android assistant.") {
+    fun testVoicePreview(sampleText: String = "Hello sweetheart, I am NISU AI. Aapka din kaisa raha? Main hamesha aapke saath hoon!") {
         viewModelScope.launch {
-            _voiceTestStatus.value = "Generating voice preview..."
+            _voiceTestStatus.value = "Playing sweet female voice preview..."
             voiceManager.speak(sampleText)
-            _voiceTestStatus.value = "Playing: ${settingsManager.getVoiceProvider()}"
+            _voiceTestStatus.value = "Active: ${settingsManager.getVoicePack()} (${settingsManager.getVoiceProvider()})"
         }
     }
 
@@ -430,7 +587,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 _lastAutomationResult.value = AutomationResult(
                     false,
                     "Overlay Permission Required",
-                    "Please grant 'Display over other apps' permission to enable the Rainbow RGB Border."
+                    "Please grant 'Display over other apps' permission to enable the RGB Border system overlay."
                 )
                 return false
             }
@@ -439,7 +596,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             _lastAutomationResult.value = AutomationResult(
                 true,
                 "RGB Border Enabled",
-                "Rainbow RGB border active around screen edges."
+                "RGB border active around screen edges."
             )
             return true
         } else {
@@ -448,111 +605,85 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             _lastAutomationResult.value = AutomationResult(
                 true,
                 "RGB Border Disabled",
-                "Rainbow RGB border stopped."
+                "RGB border system overlay stopped."
             )
-            return false
+            return true
         }
     }
 
-    fun isAccessibilityServiceActive(): Boolean {
-        return OgSahidAccessibilityService.isRunning ||
-                OgSahidAccessibilityService.isAccessibilityPermissionGranted(getApplication())
-    }
+    // --- Gemini Connection Testing ---
+    fun testGeminiConnection() {
+        val apiKey = settingsManager.getApiKey()
+        val model = settingsManager.getSelectedModel()
+        _isTestingConnection.value = true
+        _connectionStatus.value = "Connecting to Gemini ($model)..."
 
-    fun isOverlayPermissionActive(): Boolean {
-        return RgbBorderOverlayService.isOverlayPermissionGranted(getApplication())
-    }
-
-    // --- Coding Assistant ---
-    fun generateCode(prompt: String, language: String, isDebugging: Boolean = false) {
         viewModelScope.launch {
-            _isGenerating.value = true
-            _generatedCode.value = null
-            _codeExplanation.value = null
-
-            val apiKey = settingsManager.getApiKey()
-            val model = settingsManager.getSelectedModel()
-
-            if (apiKey.isBlank()) {
-                _generatedCode.value = "// Gemini API key is missing.\n// Please set your key in Settings."
-                _codeExplanation.value = "Cannot generate code without a valid Gemini API key."
-                _isGenerating.value = false
-                return@launch
-            }
-
-            val systemInstr = """
-You are a senior principal developer and code mentor in $language.
-The user wants ${if (isDebugging) "to debug their code and fix errors" else "a complete, clean, tested implementation"}.
-Format your response in two clear sections:
-```$language
-// Complete code here with comments
-```
-EXPLANATION:
-Detailed beginner-friendly breakdown of how the code works, architecture, and Termux/Android build steps if applicable.
-            """.trimIndent()
-
-            val result = geminiService.sendMessage(
-                apiKey = apiKey,
-                model = model,
-                userPrompt = "Language: $language\nTask: $prompt\nProvide production-grade code.",
-                recentHistory = emptyList(),
-                memories = emptyList(),
-                persona = "Coding & Tech Mentor",
-                language = "English",
-                temperature = 0.2f
-            )
-
-            result.fold(
-                onSuccess = { fullText ->
-                    val codeRegex = Regex("""```(?:[a-zA-Z0-9_\-+]*)\n([\s\S]*?)```""")
-                    val match = codeRegex.find(fullText)
-                    if (match != null) {
-                        _generatedCode.value = match.groupValues[1].trim()
-                        val explanationPart = fullText.replace(match.value, "").trim()
-                        _codeExplanation.value = explanationPart.ifBlank { "Code successfully generated." }
-                    } else {
-                        _generatedCode.value = fullText
-                        _codeExplanation.value = "Review the generated solution above."
-                    }
-                },
-                onFailure = { err ->
-                    _generatedCode.value = "// Error: ${err.message}"
-                    _codeExplanation.value = "Generation failed. Please verify your API key and network connection."
-                }
-            )
-
-            _isGenerating.value = false
-        }
-    }
-
-    // --- Settings Connection Test ---
-    fun testApiConnection() {
-        viewModelScope.launch {
-            _isTestingConnection.value = true
-            _connectionStatus.value = "Testing Gemini API connection..."
-            val key = settingsManager.getApiKey()
-            val model = settingsManager.getSelectedModel()
-
-            val result = geminiService.testConnection(key, model)
+            val result = geminiService.testConnection(apiKey, model)
             result.fold(
                 onSuccess = { msg ->
                     _connectionStatus.value = msg
                 },
                 onFailure = { err ->
-                    _connectionStatus.value = "Failed: ${err.message}"
+                    _connectionStatus.value = "Error: ${err.message}"
                 }
             )
             _isTestingConnection.value = false
         }
     }
 
-    fun dismissAutomationBanner() {
-        _lastAutomationResult.value = null
+    // --- Coding Assistant Integration ---
+    fun generateCode(prompt: String, language: String, isDebugging: Boolean = false) {
+        val apiKey = settingsManager.getApiKey()
+        if (apiKey.isBlank()) {
+            _generatedCode.value = "// Error: Gemini API Key missing. Please set your API key in Settings."
+            return
+        }
+
+        viewModelScope.launch {
+            _isGenerating.value = true
+            _generatedCode.value = if (isDebugging) "// NISU AI is debugging $language code..." else "// NISU AI is generating $language code..."
+            val codingPrompt = if (isDebugging) {
+                """
+                You are NISU AI Coding Studio.
+                Inspect, debug, and fix the following $language code:
+                $prompt
+                Provide fixed executable code and explain the root cause and solution.
+                """.trimIndent()
+            } else {
+                """
+                You are NISU AI Coding Studio.
+                Write production-grade, bug-free, clean $language code for:
+                $prompt
+                Return ONLY the raw executable code without markdown wrappers if possible, or markdown code block.
+                """.trimIndent()
+            }
+
+            val result = geminiService.sendMessage(
+                apiKey = apiKey,
+                model = settingsManager.getSelectedModel(),
+                userPrompt = codingPrompt,
+                recentHistory = emptyList(),
+                memories = emptyList(),
+                persona = "Coding & Tech Mentor",
+                language = "English"
+            )
+
+            result.fold(
+                onSuccess = { code ->
+                    _generatedCode.value = code
+                },
+                onFailure = { err ->
+                    _generatedCode.value = "// Generation error: ${err.message}"
+                }
+            )
+            _isGenerating.value = false
+        }
     }
 
     override fun onCleared() {
         super.onCleared()
-        callTimerJob?.cancel()
         voiceManager.destroy()
+        screenCaptureHelper.stopCapture()
     }
 }

@@ -75,7 +75,7 @@ fun TermuxGuideDialog(
                     .verticalScroll(rememberScrollState())
             ) {
                 Text(
-                    text = "Step-by-step instructions to compile and build OG SAHID AI APK directly on your Android phone using Termux without a PC:",
+                    text = "Step-by-step instructions to compile and build NISU AI APK directly on your Android phone using Termux without a PC:",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -102,7 +102,7 @@ fun TermuxGuideDialog(
                 CommandStepCard(
                     step = "3. Extract or Clone Project",
                     desc = "Navigate to project directory:",
-                    command = "cd ~/og-sahid-ai || cd ~/storage/downloads/og-sahid-ai",
+                    command = "cd ~/nisu-ai || cd ~/storage/downloads/nisu-ai",
                     context = context
                 )
 

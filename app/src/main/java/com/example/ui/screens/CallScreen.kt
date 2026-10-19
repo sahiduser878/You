@@ -70,7 +70,7 @@ fun CallScreen(
     val stateText = when (callState) {
         VoiceCallState.LISTENING -> "Listening to you..."
         VoiceCallState.THINKING -> "Thinking..."
-        VoiceCallState.SPEAKING -> "OG SAHID AI speaking..."
+        VoiceCallState.SPEAKING -> "NISU AI speaking..."
         VoiceCallState.MUTED -> "Microphone muted"
         VoiceCallState.IDLE -> "Connecting..."
     }
@@ -109,7 +109,7 @@ fun CallScreen(
             modifier = Modifier.padding(top = 16.dp)
         ) {
             Text(
-                text = "OG SAHID AI LIVE CALL",
+                text = "NISU AI LIVE CALL",
                 style = MaterialTheme.typography.labelSmall.copy(
                     letterSpacing = 2.sp,
                     fontWeight = FontWeight.Black

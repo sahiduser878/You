@@ -1,6 +1,6 @@
 {
-  "name": "OG SAHID AI",
-  "description": "Comprehensive Android Assistant: Natural Female Voice, Accessibility Phone Automation, Rainbow RGB Edge Border, Coding, and Memory.",
+  "name": "NISU AI",
+  "description": "Fast, reliable female AI voice assistant with a natural, soft, sweet romantic voice, real-time voice commands, accessibility phone control, screen understanding, and RGB edge glow.",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

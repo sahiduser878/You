@@ -202,7 +202,7 @@ fun PermissionsScreen(
                     glowColor = YesminCyan
                 ) {
                     Text(
-                        text = "1. Zero Third-Party Trackers: OG SAHID AI runs entirely on your device with direct calls to Google Gemini API.\n\n" +
+                        text = "1. Zero Third-Party Trackers: NISU AI runs entirely on your device with direct calls to Google Gemini API.\n\n" +
                                "2. Local Memory Security: Your remembered facts are saved in an on-device Room SQLite database. Private conversation data is kept separate from API credentials.\n\n" +
                                "3. Voice Security: Audio is only processed when you tap the call or microphone button. No covert background eavesdropping.",
                         style = MaterialTheme.typography.bodySmall,

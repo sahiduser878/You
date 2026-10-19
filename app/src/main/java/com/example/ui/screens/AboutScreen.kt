@@ -74,7 +74,7 @@ fun AboutScreen(
             TopAppBar(
                 title = {
                     Text(
-                        text = "About OG SAHID AI",
+                        text = "About NISU AI",
                         style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
                         color = MaterialTheme.colorScheme.onSurface
                     )
@@ -110,7 +110,7 @@ fun AboutScreen(
                 YesminAvatar(size = 120.dp, state = VoiceCallState.IDLE)
                 Spacer(modifier = Modifier.height(10.dp))
                 Text(
-                    text = "OG SAHID AI v2.0",
+                    text = "NISU AI v2.0",
                     style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
                     color = MaterialTheme.colorScheme.onSurface
                 )
@@ -128,11 +128,12 @@ fun AboutScreen(
                     glowColor = YesminPink
                 ) {
                     Text(
-                        text = "OG SAHID AI is crafted as a premier Android AI companion & controller:\n\n" +
-                               "• Natural Female Voice: Crystal clear, expressive, and warm voice in Hindi, Hinglish, and English via ElevenLabs or Gemini audio.\n\n" +
+                        text = "NISU AI is crafted as a premier Android AI companion & controller:\n\n" +
+                               "• Natural Female Voice: Soft, sweet, warm, romantic-style voice in Hindi, Hinglish, and English with customizable Voice Packs.\n\n" +
                                "• Full Phone Control: Accessibility Service and Intent integrations to open apps, compose WhatsApp messages with confirmation, scroll, navigate back/home, and tap buttons.\n\n" +
-                               "• Rainbow RGB Edge Border: Floating system overlay providing immersive edge lighting during interaction.\n\n" +
-                               "• Coding & Memory Bank: Instant coding assistance, project building guides, and persistent memory bank.",
+                               "• Screen Sharing & Understanding: Visual inspection of active Android screens with multimodal AI extraction and guidance.\n\n" +
+                               "• RGB Edge Glow: Animated glowing screen borders with multiple modes, palettes, speed, and thickness controls.\n\n" +
+                               "• Real-Time Voice Commands: Fast event-driven speech recognition and zero-latency device action execution.",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )

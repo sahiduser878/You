@@ -1,6 +1,7 @@
 package com.example.ui.screens
 
 import androidx.activity.compose.BackHandler
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -27,6 +28,9 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.automirrored.filled.VolumeUp
 import androidx.compose.material.icons.filled.Mic
+import androidx.compose.material.icons.filled.Stop
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
@@ -50,7 +54,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
@@ -59,12 +62,15 @@ import androidx.compose.ui.unit.sp
 import com.example.data.local.entity.ChatMessageEntity
 import com.example.ui.MainViewModel
 import com.example.ui.Screen
+import com.example.ui.VoiceCommandStatus
+import com.example.ui.components.VoicePulseVisualizer
 import com.example.ui.theme.BackgroundObsidian
 import com.example.ui.theme.SurfaceCard
 import com.example.ui.theme.SurfaceDarkNavy
 import com.example.ui.theme.YesminCyan
 import com.example.ui.theme.YesminPink
 import com.example.ui.theme.YesminPurple
+import com.example.voice.VoiceCallState
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -78,6 +84,11 @@ fun ChatScreen(
 
     val messages by viewModel.chatMessages.collectAsState()
     val isGenerating by viewModel.isGenerating.collectAsState()
+    val commandStatus by viewModel.commandStatus.collectAsState()
+    val currentActionText by viewModel.currentActionText.collectAsState()
+    val voiceState by viewModel.voiceManager.voiceState.collectAsState()
+    val audioRms by viewModel.voiceManager.rmsLevel.collectAsState()
+
     var inputText by remember { mutableStateOf("") }
     val listState = rememberLazyListState()
 
@@ -87,6 +98,9 @@ fun ChatScreen(
         }
     }
 
+    val isSpeaking = voiceState == VoiceCallState.SPEAKING || commandStatus == VoiceCommandStatus.SPEAKING
+    val isListening = voiceState == VoiceCallState.LISTENING || commandStatus == VoiceCommandStatus.LISTENING
+
     Scaffold(
         modifier = modifier.fillMaxSize(),
         topBar = {
@@ -94,14 +108,14 @@ fun ChatScreen(
                 title = {
                     Column {
                         Text(
-                            text = "OG SAHID AI Chat",
+                            text = "NISU AI Chat",
                             style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
                             color = MaterialTheme.colorScheme.onSurface
                         )
                         Text(
-                            text = "${viewModel.settingsManager.getPersona()} • ${viewModel.settingsManager.getLanguage()}",
+                            text = "${viewModel.settingsManager.getVoicePack()} • ${viewModel.settingsManager.getLanguage()}",
                             style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp),
-                            color = YesminCyan
+                            color = YesminPink
                         )
                     }
                 },
@@ -117,6 +131,21 @@ fun ChatScreen(
                         )
                     }
                 },
+                actions = {
+                    // Stop speaking button when TTS is speaking
+                    if (isSpeaking) {
+                        IconButton(
+                            onClick = { viewModel.voiceManager.stopSpeaking() },
+                            modifier = Modifier.testTag("chat_stop_tts_button")
+                        ) {
+                            Icon(
+                                Icons.Default.Stop,
+                                contentDescription = "Stop Speaking",
+                                tint = Color(0xFFFF5252)
+                            )
+                        }
+                    }
+                },
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = SurfaceDarkNavy
                 )
@@ -129,6 +158,60 @@ fun ChatScreen(
                 .fillMaxSize()
                 .padding(innerPadding)
         ) {
+            // Real-Time Status / Waveform Bar
+            Surface(
+                color = SurfaceDarkNavy,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 6.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Box(
+                            modifier = Modifier
+                                .size(8.dp)
+                                .background(
+                                    when (commandStatus) {
+                                        VoiceCommandStatus.LISTENING -> YesminCyan
+                                        VoiceCommandStatus.PROCESSING -> YesminPurple
+                                        VoiceCommandStatus.EXECUTING -> Color(0xFF00E676)
+                                        VoiceCommandStatus.SPEAKING -> YesminPink
+                                        else -> Color(0xFF94A3B8)
+                                    },
+                                    CircleShape
+                                )
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = currentActionText,
+                            style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                            color = when (commandStatus) {
+                                VoiceCommandStatus.LISTENING -> YesminCyan
+                                VoiceCommandStatus.PROCESSING -> YesminPurple
+                                VoiceCommandStatus.EXECUTING -> Color(0xFF00E676)
+                                VoiceCommandStatus.SPEAKING -> YesminPink
+                                else -> Color(0xFF94A3B8)
+                            }
+                        )
+                    }
+
+                    if (isSpeaking) {
+                        Button(
+                            onClick = { viewModel.voiceManager.stopSpeaking() },
+                            shape = RoundedCornerShape(8.dp),
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0x33FF5252)),
+                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp)
+                        ) {
+                            Text("Stop Voice", color = Color(0xFFFF5252), fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                        }
+                    }
+                }
+            }
+
             // Quick suggestion prompts
             LazyRow(
                 modifier = Modifier
@@ -137,11 +220,12 @@ fun ChatScreen(
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 val suggestions = listOf(
-                    "Hey OG SAHID, kaise ho?",
-                    "Play romantic song on YouTube",
-                    "Remember that I like black coffee",
-                    "How to build APK using Termux?",
-                    "Open Camera"
+                    "Hey NISU, kaise ho?",
+                    "Open WhatsApp and message Mom saying Hi",
+                    "Play romantic music on YouTube",
+                    "Open phone settings",
+                    "Scroll down",
+                    "Turn up brightness"
                 )
                 items(suggestions) { prompt ->
                     FilterChip(
@@ -154,99 +238,82 @@ fun ChatScreen(
                         label = { Text(prompt, fontSize = 12.sp) },
                         colors = FilterChipDefaults.filterChipColors(
                             containerColor = SurfaceCard,
-                            labelColor = YesminCyan
+                            labelColor = MaterialTheme.colorScheme.onSurfaceVariant
                         ),
                         border = FilterChipDefaults.filterChipBorder(
                             enabled = true,
                             selected = false,
-                            borderColor = YesminCyan.copy(alpha = 0.3f)
+                            borderColor = YesminCyan.copy(alpha = 0.25f)
                         )
                     )
                 }
             }
 
             // Message list
-            Box(
+            LazyColumn(
+                state = listState,
                 modifier = Modifier
                     .weight(1f)
                     .fillMaxWidth()
+                    .padding(horizontal = 16.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+                contentPadding = PaddingValues(vertical = 12.dp)
             ) {
                 if (messages.isEmpty()) {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .padding(24.dp),
-                        verticalArrangement = Arrangement.Center,
-                        horizontalAlignment = Alignment.CenterHorizontally
-                    ) {
+                    item {
                         Box(
                             modifier = Modifier
-                                .size(64.dp)
-                                .background(YesminPurple.copy(alpha = 0.15f), CircleShape),
+                                .fillMaxWidth()
+                                .padding(top = 40.dp),
                             contentAlignment = Alignment.Center
                         ) {
-                            Icon(
-                                imageVector = Icons.Default.Mic,
-                                contentDescription = null,
-                                tint = YesminCyan,
-                                modifier = Modifier.size(32.dp)
-                            )
-                        }
-                        Spacer(modifier = Modifier.height(16.dp))
-                        Text(
-                            text = "Start a conversation with OG SAHID AI",
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onSurface
-                        )
-                        Spacer(modifier = Modifier.height(6.dp))
-                        Text(
-                            text = "Speak in English, Hindi, or Hinglish. Ask questions, request tasks, or just chat!",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            textAlign = androidx.compose.ui.text.style.TextAlign.Center
-                        )
-                    }
-                } else {
-                    LazyColumn(
-                        state = listState,
-                        modifier = Modifier.fillMaxSize(),
-                        contentPadding = PaddingValues(12.dp),
-                        verticalArrangement = Arrangement.spacedBy(10.dp)
-                    ) {
-                        items(messages) { msg ->
-                            ChatMessageItem(
-                                message = msg,
-                                onSpeak = { text ->
-                                    viewModel.voiceManager.speak(text)
-                                }
-                            )
-                        }
-                        if (isGenerating) {
-                            item {
-                                Row(
-                                    modifier = Modifier.padding(8.dp),
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    CircularProgressIndicator(
-                                        modifier = Modifier.size(16.dp),
-                                        strokeWidth = 2.dp,
-                                        color = YesminCyan
-                                    )
-                                    Spacer(modifier = Modifier.width(8.dp))
-                                    Text(
-                                        text = "OG SAHID AI is thinking...",
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = YesminCyan
-                                    )
-                                }
+                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                Text(
+                                    text = "Start chatting with NISU AI",
+                                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                                    color = YesminPink
+                                )
+                                Spacer(modifier = Modifier.height(6.dp))
+                                Text(
+                                    text = "Ask questions, give phone commands, or tap the mic to speak.",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
                             }
+                        }
+                    }
+                }
+
+                items(messages) { msg ->
+                    ChatMessageItem(
+                        message = msg,
+                        onSpeak = { text -> viewModel.voiceManager.speak(text) }
+                    )
+                }
+
+                if (isGenerating) {
+                    item {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.padding(8.dp)
+                        ) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(16.dp),
+                                strokeWidth = 2.dp,
+                                color = YesminCyan
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = "NISU AI is thinking...",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = YesminCyan
+                            )
                         }
                     }
                 }
             }
 
-            // Input Bar
+            // Bottom Input Bar
             Surface(
                 color = SurfaceDarkNavy,
                 modifier = Modifier.fillMaxWidth()
@@ -263,7 +330,7 @@ fun ChatScreen(
                         modifier = Modifier
                             .weight(1f)
                             .testTag("chat_input_field"),
-                        placeholder = { Text("Ask or command OG SAHID AI...", color = Color(0xFF64748B)) },
+                        placeholder = { Text("Ask or command NISU AI...", color = Color(0xFF64748B)) },
                         colors = OutlinedTextFieldDefaults.colors(
                             focusedBorderColor = YesminCyan,
                             unfocusedBorderColor = Color(0xFF263352),
@@ -276,22 +343,34 @@ fun ChatScreen(
                         maxLines = 4
                     )
                     Spacer(modifier = Modifier.width(8.dp))
+
+                    // Mic Button
                     IconButton(
                         onClick = {
-                            viewModel.voiceManager.startListeningOnce()
+                            if (isListening) {
+                                viewModel.stopListeningInstant()
+                            } else {
+                                viewModel.startListeningInstant()
+                            }
                         },
                         modifier = Modifier
                             .size(44.dp)
-                            .background(YesminPurple.copy(alpha = 0.2f), CircleShape)
+                            .background(
+                                if (isListening) YesminPink else YesminPurple.copy(alpha = 0.2f),
+                                CircleShape
+                            )
                             .testTag("chat_mic_button")
                     ) {
                         Icon(
-                            imageVector = Icons.Default.Mic,
+                            imageVector = if (isListening) Icons.Default.Stop else Icons.Default.Mic,
                             contentDescription = "Voice Input",
-                            tint = YesminPurple
+                            tint = if (isListening) Color.White else YesminPurple
                         )
                     }
+
                     Spacer(modifier = Modifier.width(4.dp))
+
+                    // Send Button
                     IconButton(
                         onClick = {
                             if (inputText.isNotBlank()) {
@@ -326,7 +405,7 @@ fun ChatMessageItem(
     val align = if (isUser) Alignment.End else Alignment.Start
     val containerColor = if (isUser) Color(0xFF004E5E) else SurfaceCard
     val textColor = if (isUser) Color(0xFFE0F7FA) else MaterialTheme.colorScheme.onSurface
-    val borderColor = if (isUser) YesminCyan.copy(alpha = 0.4f) else YesminPurple.copy(alpha = 0.3f)
+    val borderColor = if (isUser) YesminCyan.copy(alpha = 0.4f) else YesminPink.copy(alpha = 0.35f)
 
     Column(
         modifier = Modifier.fillMaxWidth(),
@@ -350,7 +429,7 @@ fun ChatMessageItem(
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Text(
-                        text = if (isUser) "You" else "OG SAHID AI",
+                        text = if (isUser) "You" else "NISU AI",
                         style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
                         color = if (isUser) YesminCyan else YesminPink
                     )

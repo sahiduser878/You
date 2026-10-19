@@ -82,8 +82,8 @@ fun AutomationScreen(
 
     var youtubeQuery by remember { mutableStateOf("Lo-Fi Beats for Coding") }
     var phoneNumber by remember { mutableStateOf("1234567890") }
-    var smsBody by remember { mutableStateOf("Hey, sent via OG SAHID AI!") }
-    var alarmMessage by remember { mutableStateOf("Wake Up with OG SAHID AI") }
+    var smsBody by remember { mutableStateOf("Hey, sent via NISU AI!") }
+    var alarmMessage by remember { mutableStateOf("Wake Up with NISU AI") }
     var timerSeconds by remember { mutableStateOf("120") }
     var mapQuery by remember { mutableStateOf("Coffee shop near me") }
 

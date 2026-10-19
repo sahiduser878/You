@@ -1,74 +1,45 @@
-# OG SAHID AI — Complete Android Assistant & Phone Controller
+# NISU AI — Fast, Beautiful Female Voice Assistant & Phone Controller
 
-OG SAHID AI is a comprehensive, production-grade Android assistant combining a natural, warm, expressive female voice with system-wide phone control via Accessibility and Intents, a floating animated RGB edge border, coding assistance, and persistent memory.
+NISU AI is a production-grade Android AI assistant combining a natural, soft, sweet, romantic-style female voice with real-time event-driven voice commands, deep Android Accessibility automation, live screen sharing & multimodal understanding, and fully customizable RGB edge glow.
 
-## Features Overview
+## Key Features
 
-### 1. Natural Female Voice Engine (Highest Priority)
-- **Natural, Expressive Female Persona**: Friendly, caring, conversational tone with realistic pauses and smooth pacing. Clear pronunciation in **Hindi**, **Hinglish**, and **English**.
-- **Voice Provider Options**:
-  - **Gemini TTS**: Native audio generation using Gemini audio models.
-  - **ElevenLabs TTS**: Direct integration with ElevenLabs REST API with masked API key input, customizable Voice ID, Model ID, stability and similarity sliders, test voice button, and preview.
-  - **System Fallback**: Android system TextToSpeech fallback if offline or no keys are configured.
-- **Audio Pipeline Features**:
-  - Stops speaking immediately on user interrupt or cancel.
-  - Prevents repeated speech and audio overlapping.
-  - Full error diagnosis for network issues, invalid keys, or quota limits.
+### 1. Beautiful Female Voice (Zero Delay & Sweet Tone)
+- **Natural, Sweet Romantic Female Voice**: Warm, gentle, affectionate tone with natural Hindi, Hinglish, and English pronunciation.
+- **Voice Packs**:
+  - *Romantic Sweet* (1.22x pitch, smooth relaxed pacing)
+  - *Gentle Soft* (1.15x pitch, calm whisper)
+  - *Warm Conversational* (1.10x pitch, engaging and natural)
+  - *Expressive Melodic* (1.28x pitch, playful and melodic)
+- **Voice Controls**: Rate slider, pitch slider, volume slider, and instant voice preview.
+- **Ultra-Fast Playback**: Zero-latency local TTS engine + optional ElevenLabs Studio & Gemini TTS with immediate fallback.
 
-### 2. Full Android Control Through Voice & Actions
-- **Voice Command Parsing**: Converts spoken commands into structured actions.
-- **Native AccessibilityService (`OgSahidAccessibilityService`)**:
-  - Authorized UI interaction: Tapping visible buttons by text, scrolling down/up, navigating Back and Home.
-  - Text input into active fields.
-- **WhatsApp Workflow** (e.g. *"WhatsApp kholo, Mom ki chat select karo aur Hi bhejo"*):
-  1. Opens WhatsApp.
-  2. Resolves contact target.
-  3. Composes message.
-  4. Presents a confirmation prompt before sending to prevent accidental messages.
-- **Application Launching**: Direct intents for WhatsApp, YouTube, Settings, Camera, Maps, Phone dialer, and SMS.
-- **Live Action Status**: Status HUD cards showing executed and pending actions with confirm/cancel buttons.
+### 2. Real-Time Voice Command Pipeline
+- Instant listening on microphone tap without delays or blocking operations.
+- Direct local command execution (< 100ms) for opening apps, adjusting brightness/volume, scrolling, navigating back/home, and WhatsApp messaging.
+- Real-time status pipeline: `Listening` → `Processing` → `Executing` → `Completed`.
+- Instant interrupt & stop speaking controls.
 
-### 3. Accessibility & Phone Control Settings
-- Dedicated Accessibility settings section with real-time status check.
-- "Enable Service" button navigating straight to Android Accessibility Settings.
-- Quick test action (simulating Back navigation).
-- Clear troubleshooting instructions for user activation.
+### 3. Accessibility & System-Wide Automation
+- Native `OgSahidAccessibilityService` for system-wide control:
+  - App launching (WhatsApp, YouTube, Settings, Camera, Chrome, Maps, Calculator).
+  - UI element inspection & node tapping (`clickNodeByText`).
+  - Text entry into focused fields (`typeTextIntoFocusedOrFirstInput`).
+  - System gestures: Back, Home, Recents, Notifications, Scroll Up, Scroll Down.
+- Multi-step WhatsApp messaging workflow with user confirmation safety.
+- Dedicated Accessibility screen with diagnostics checklist and interactive test runner.
 
-### 4. Floating Overlay & RGB Border
-- System alert window overlay (`RgbBorderOverlayService`) rendering a smooth animated rainbow gradient along the device screen edges.
-- Toggle switch to start/stop the border service.
-- Real-time controls for border width, brightness, and animation cycle speed.
-- Overlay permission check and deep-link to Android settings.
+### 4. Screen Sharing & Understanding
+- Android `MediaProjection` and Accessibility screenshot pipeline.
+- Live frame preview thumbnail with instant snapshot capture.
+- Quick AI actions:
+  - **Analyze Screen**: Full multimodal description of active screen content.
+  - **Summarize Page**: Extracts and condenses visible text and articles.
+  - **Find Elements**: Locates interactive buttons, fields, and links.
+- Privacy-first: frames only captured on user request, zero third-party telemetry.
 
-### 5. AI Brain & Local Database
-- Official Google Gemini model selection (`gemini-3.5-flash`, `gemini-3.1-pro-preview`, etc.).
-- Masked API key management with latency connection testing.
-- Room SQLite database (`memories` and `chat_messages`) for continuous memory retention.
-- Multi-modal image analysis and OCR tools.
-
----
-
-## How to Build the APK in Termux (On Android Phone)
-
-Follow these commands inside the **Termux** app:
-
-```bash
-# 1. Update Termux and install tools
-pkg update -y && pkg install -y openjdk-17 git wget unzip curl
-
-# 2. Grant storage permissions
-termux-setup-storage
-
-# 3. Navigate to the project directory
-cd ~/og-sahid-ai || cd ~/storage/downloads/og-sahid-ai
-
-# 4. Give executable rights to gradle wrapper
-chmod +x gradlew
-
-# 5. Build Debug APK (with memory optimization for mobile CPUs)
-./gradlew assembleDebug --no-daemon -Dorg.gradle.jvmargs="-Xmx1536m -XX:MaxMetaspaceSize=512m"
-
-# 6. Copy output APK to your Download folder
-cp app/build/outputs/apk/debug/app-debug.apk /sdcard/Download/OGSahidAI.apk
-```
-Open **Files** on your phone, go to **Downloads**, tap **OGSahidAI.apk**, and install.
+### 5. Customizable RGB Edge Glow
+- Stunning animated glow along screen edges in-app and as a system overlay.
+- Animation modes: *Rainbow Wave*, *Breathing Glow*, *Pulse*, *Static Gradient*, *Sound Reactive*.
+- Color palettes: *Rainbow*, *Neon Pink*, *Cyberpunk Blue*, *Warm Sunset*, *Electric Green*.
+- Interactive controls for speed, thickness, and brightness.

@@ -21,9 +21,9 @@ import java.util.concurrent.TimeUnit
 class NaturalVoiceEngine(private val context: Context) {
 
     private val httpClient = OkHttpClient.Builder()
-        .connectTimeout(30, TimeUnit.SECONDS)
-        .readTimeout(30, TimeUnit.SECONDS)
-        .writeTimeout(30, TimeUnit.SECONDS)
+        .connectTimeout(5, TimeUnit.SECONDS)
+        .readTimeout(8, TimeUnit.SECONDS)
+        .writeTimeout(5, TimeUnit.SECONDS)
         .build()
 
     private var mediaPlayer: MediaPlayer? = null
@@ -127,7 +127,7 @@ class NaturalVoiceEngine(private val context: Context) {
         onComplete: () -> Unit,
         onError: (String) -> Unit
     ) {
-        val endpoint = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-tts:generateContent?key=$apiKey"
+        val endpoint = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=$apiKey"
 
         try {
             val requestJson = JSONObject().apply {
